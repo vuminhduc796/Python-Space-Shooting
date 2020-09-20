@@ -10,21 +10,21 @@ pygame.display.set_caption("Space Shooter")
 
 
 # Load images
-ENEMY_SHIP_1 = pygame.image.load(os.path.join("images", "enemy_ship_1.png"))
-ENEMY_SHIP_2 = pygame.image.load(os.path.join("images", "enemy_ship_2.png"))
-ENEMY_SHIP_3 = pygame.image.load(os.path.join("images", "enemy_ship_3.png"))
-ENEMY_SHIP_4 = pygame.image.load(os.path.join("images", "enemy_ship_4.png"))
+ENEMY_SHIP_1 = pygame.transform.scale(pygame.image.load(os.path.join("images", "enemy_ship_1.png")), (30, 30))
+ENEMY_SHIP_2 = pygame.transform.scale(pygame.image.load(os.path.join("images", "enemy_ship_2.png")), (30, 30))
+ENEMY_SHIP_3 = pygame.transform.scale(pygame.image.load(os.path.join("images", "enemy_ship_3.png")), (30, 30))
+ENEMY_SHIP_4 = pygame.transform.scale(pygame.image.load(os.path.join("images", "enemy_ship_4.png")), (100, 100))
 
 # Player player
-PLAYER_SHIP = pygame.image.load(os.path.join("images", "player_ship.png"))
+PLAYER_SHIP = pygame.transform.scale(pygame.image.load(os.path.join("images", "player_ship.png")), (50, 50))
 
 # bullets
-PLAYER_BULLET_1 = pygame.image.load(os.path.join("images", "player_bullet_1.png"))
-PLAYER_BULLET_2 = pygame.image.load(os.path.join("images", "player_bullet_2.png"))
-PLAYER_BULLET_3 = pygame.image.load(os.path.join("images", "player_bullet_3.png"))
-PLAYER_BULLET_4 = pygame.image.load(os.path.join("images", "player_bullet_4.png"))
+PLAYER_BULLET_1 = pygame.transform.scale(pygame.image.load(os.path.join("images", "player_bullet_1.png")), (40, 40))
+PLAYER_BULLET_2 = pygame.transform.scale(pygame.image.load(os.path.join("images", "player_bullet_2.png")), (40, 40))
+PLAYER_BULLET_3 = pygame.transform.scale(pygame.image.load(os.path.join("images", "player_bullet_3.png")), (40, 40))
+PLAYER_BULLET_4 = pygame.transform.scale(pygame.image.load(os.path.join("images", "player_bullet_4.png")), (40, 40))
 
-ENEMY_BULLET_1 = pygame.image.load(os.path.join("images", "enemy_bullet.png"))
+ENEMY_BULLET_1 = pygame.transform.scale(pygame.image.load(os.path.join("images", "enemy_bullet.png")), (50,50))
 # Background
 BG = pygame.transform.scale(pygame.image.load(os.path.join("images", "background.png")), (WIDTH, HEIGHT))
 
@@ -39,7 +39,7 @@ class Bullet:
         window.blit(self.img, (self.x, self.y))
 
     def move(self, vel):
-        self.x -= vel
+        self.x += vel
 
     def off_screen(self, width):
         return not(self.x <= width and self.x >= 0)
@@ -56,24 +56,24 @@ class Ship:
         self.y = y
         self.health = health
         self.ship_img = None
-        self.laser_img = None
-        self.lasers = []
+        self.bullet_img = None
+        self.bullets = []
         self.cool_down_counter = 0
 
     def draw(self, window):
         window.blit(self.ship_img, (self.x, self.y))
-        for laser in self.lasers:
-            laser.draw(window)
+        for bullet in self.bullets:
+            bullet.draw(window)
 
-    def move_lasers(self, vel, obj):
+    def move_bullets(self, vel, obj):
         self.cooldown()
-        for laser in self.lasers:
-            laser.move(vel)
-            if laser.off_screen(WIDTH):
-                self.lasers.remove(laser)
-            elif laser.collision(obj):
+        for bullet in self.bullets:
+            bullet.move(vel)
+            if bullet.off_screen(WIDTH):
+                self.bullets.remove(bullet)
+            elif bullet.collision(obj):
                 obj.health -= 10
-                self.lasers.remove(laser)
+                self.bullets.remove(bullet)
 
     def cooldown(self):
         if self.cool_down_counter >= self.COOLDOWN:
@@ -83,8 +83,8 @@ class Ship:
 
     def shoot(self):
         if self.cool_down_counter == 0:
-            bullet = Bullet(self.x, self.y, self.laser_img)
-            self.lasers.append(bullet)
+            bullet = Bullet(self.x, self.y, self.bullet_img)
+            self.bullets.append(bullet)
             self.cool_down_counter = 1
 
     def get_width(self):
@@ -97,23 +97,29 @@ class Player(Ship):
     def __init__(self, x, y, health=100):
         super().__init__(x, y, health)
         self.ship_img = PLAYER_SHIP
-        self.weapons_img = [PLAYER_BULLET_1,PLAYER_BULLET_2,PLAYER_BULLET_3,PLAYER_BULLET_4]
-        self.laser_img = PLAYER_BULLET_3
+        self.weapons= {
+                1: (PLAYER_BULLET_1, 10, 40),
+                2: (PLAYER_BULLET_2, 3, 20),
+                3: (PLAYER_BULLET_3, 12, 60),
+                4: (PLAYER_BULLET_4, 8, 45)
+                }
+        self.current_weapon = 1
+        self.bullet_img = self.weapons[self.current_weapon][0]
         self.mask = pygame.mask.from_surface(self.ship_img)
         self.max_health = health
 
-    def move_lasers(self, vel, objs):
+    def move_bullets(self, objs):
         self.cooldown()
-        for laser in self.lasers:
-            laser.move(vel)
-            if laser.off_screen(WIDTH):
-                self.lasers.remove(laser)
+        for bullet in self.bullets:
+            bullet.move(self.weapons[self.current_weapon][1])
+            if bullet.off_screen(WIDTH):
+                self.bullets.remove(bullet)
             else:
                 for obj in objs:
-                    if laser.collision(obj):
+                    if bullet.collision(obj):
                         objs.remove(obj)
-                        if laser in self.lasers:
-                            self.lasers.remove(laser)
+                        if bullet in self.bullets:
+                            self.bullets.remove(bullet)
 
     def draw(self, window):
         super().draw(window)
@@ -122,8 +128,13 @@ class Player(Ship):
     def healthbar(self, window):
         pygame.draw.rect(window, (255,0,0), (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width(), 10))
         pygame.draw.rect(window, (0,255,0), (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width() * (self.health/self.max_health), 10))
-
-
+    def swap_weapon(self):
+        if self.cool_down_counter == 0:
+            if self.current_weapon == 4:
+                self.current_weapon = 1
+            else:
+                self.current_weapon += 1
+            self.bullet_img = self.weapons[self.current_weapon][0]
 class Enemy(Ship):
     COLOR_MAP = {
                 "red": (ENEMY_SHIP_1, ENEMY_BULLET_1),
@@ -133,7 +144,7 @@ class Enemy(Ship):
 
     def __init__(self, x, y, color, health=100):
         super().__init__(x, y, health)
-        self.ship_img, self.laser_img = self.COLOR_MAP[color]
+        self.ship_img, self.bullet_img = self.COLOR_MAP[color]
         self.mask = pygame.mask.from_surface(self.ship_img)
 
     def move(self, vel):
@@ -141,8 +152,8 @@ class Enemy(Ship):
 
     def shoot(self):
         if self.cool_down_counter == 0:
-            bullet = Bullet(self.x-20, self.y, self.laser_img)
-            self.lasers.append(bullet)
+            bullet = Bullet(self.x-20, self.y, self.bullet_img)
+            self.bullets.append(bullet)
             self.cool_down_counter = 1
 
 
@@ -165,7 +176,7 @@ def main():
     enemy_vel = 1
 
     player_vel = 5
-    laser_vel = 5
+    bullet_vel = -5
 
     player = Player(300, 630)
 
@@ -220,6 +231,8 @@ def main():
                 quit()
 
         keys = pygame.key.get_pressed()
+        if keys[pygame.K_v]:
+            player.swap_weapon()
         if keys[pygame.K_a] and player.x - player_vel > 0: # left
             player.x -= player_vel
         if keys[pygame.K_d] and player.x + player_vel + player.get_width() < WIDTH: # right
@@ -231,9 +244,10 @@ def main():
         if keys[pygame.K_SPACE]:
             player.shoot()
 
+
         for enemy in enemies[:]:
             enemy.move(enemy_vel)
-            enemy.move_lasers(laser_vel, player)
+            enemy.move_bullets(bullet_vel, player)
 
             if random.randrange(0, 2*60) == 1:
                 enemy.shoot()
@@ -245,7 +259,7 @@ def main():
                 lives -= 1
                 enemies.remove(enemy)
 
-        player.move_lasers(-laser_vel, enemies)
+        player.move_bullets(enemies)
 
 def mainmenu():
     title_font = pygame.font.SysFont("comicsans", 70)
