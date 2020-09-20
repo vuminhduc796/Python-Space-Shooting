@@ -41,8 +41,8 @@ class Bullet:
     def move(self, vel):
         self.x -= vel
 
-    def off_screen(self, height):
-        return not(self.y <= height and self.y >= 0)
+    def off_screen(self, width):
+        return not(self.x <= width and self.x >= 0)
 
     def collision(self, obj):
         return collide(self, obj)
@@ -50,6 +50,7 @@ class Bullet:
 
 class Ship:
     COOLDOWN = 30
+
     def __init__(self, x, y, health=100):
         self.x = x
         self.y = y
@@ -68,7 +69,7 @@ class Ship:
         self.cooldown()
         for laser in self.lasers:
             laser.move(vel)
-            if laser.off_screen(HEIGHT):
+            if laser.off_screen(WIDTH):
                 self.lasers.remove(laser)
             elif laser.collision(obj):
                 obj.health -= 10
@@ -105,7 +106,7 @@ class Player(Ship):
         self.cooldown()
         for laser in self.lasers:
             laser.move(vel)
-            if laser.off_screen(HEIGHT):
+            if laser.off_screen(WIDTH):
                 self.lasers.remove(laser)
             else:
                 for obj in objs:
@@ -143,13 +144,6 @@ class Enemy(Ship):
             bullet = Bullet(self.x-20, self.y, self.laser_img)
             self.lasers.append(bullet)
             self.cool_down_counter = 1
-
-
-def collide(obj1, obj2):
-    offset_x = obj2.x - obj1.x
-    offset_y = obj2.y - obj1.y
-    return obj1.mask.overlap(obj2.mask, (offset_x, offset_y)) != None
-
 
 
 def collide(object_1, object_2):
