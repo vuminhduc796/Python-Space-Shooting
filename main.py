@@ -10,9 +10,9 @@ pygame.display.set_caption("Space Shooter")
 
 
 # Load images
-ENEMY_SHIP_1 = pygame.transform.scale(pygame.image.load(os.path.join("images", "enemy_ship_1.png")), (30, 30))
-ENEMY_SHIP_2 = pygame.transform.scale(pygame.image.load(os.path.join("images", "enemy_ship_2.png")), (30, 30))
-ENEMY_SHIP_3 = pygame.transform.scale(pygame.image.load(os.path.join("images", "enemy_ship_3.png")), (30, 30))
+ENEMY_SHIP_1 = pygame.transform.scale(pygame.image.load(os.path.join("images", "enemy_ship_1.png")), (40, 40))
+ENEMY_SHIP_2 = pygame.transform.scale(pygame.image.load(os.path.join("images", "enemy_ship_2.png")), (40, 40))
+ENEMY_SHIP_3 = pygame.transform.scale(pygame.image.load(os.path.join("images", "enemy_ship_3.png")), (40, 40))
 ENEMY_SHIP_4 = pygame.transform.scale(pygame.image.load(os.path.join("images", "enemy_ship_4.png")), (100, 100))
 
 # Player player
@@ -48,25 +48,57 @@ class Bullet:
         return collide(self, obj)
 
 
+class Weapon:
+    def __init__(self,damage,velocity,cool_down,image):
+        self.damage = damage
+        self.velocity = velocity
+        self.image = image
+        self.mask = pygame.mask.from_surface(self.image)
+        self.cool_down = cool_down
+        self.cool_down_counter = 0
+
+    def cooldown(self):
+        if self.cool_down_counter >= self.cool_down:
+            self.cool_down_counter = 0
+        elif self.cool_down_counter > 0:
+            self.cool_down_counter += 1
+
+class PlayerWeapon(Weapon):
+    def __init__(self, damage, velocity,cooldown, image,  level):
+        super().__init__(damage,velocity,cooldown,image)
+        self.level = level
+
+    def upgrade(self):
+        self.level += 1
+
+
 class Ship:
-    COOLDOWN = 30
 
     def __init__(self, x, y, health=100):
+        self.base_cooldown = 30
         self.x = x
         self.y = y
         self.health = health
         self.ship_img = None
         self.bullet_img = None
         self.bullets = []
-        self.cool_down_counter = 0
+        self.max_health = health
+        self.weapons = {}
+        self.current_weapon = 1
 
     def draw(self, window):
         window.blit(self.ship_img, (self.x, self.y))
         for bullet in self.bullets:
             bullet.draw(window)
+        self.healthbar(window)
+
+    def healthbar(self, window):
+        pygame.draw.rect(window, (255,0,0), (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width(), 5))
+        pygame.draw.rect(window, (0,255,0), (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width() * (self.health/self.max_health), 5))
 
     def move_bullets(self, vel, obj):
-        self.cooldown()
+        for value in self.weapons.values():
+            value.cooldown()
         for bullet in self.bullets:
             bullet.move(vel)
             if bullet.off_screen(WIDTH):
@@ -75,17 +107,11 @@ class Ship:
                 obj.health -= 10
                 self.bullets.remove(bullet)
 
-    def cooldown(self):
-        if self.cool_down_counter >= self.COOLDOWN:
-            self.cool_down_counter = 0
-        elif self.cool_down_counter > 0:
-            self.cool_down_counter += 1
-
     def shoot(self):
-        if self.cool_down_counter == 0:
+        if self.weapons[self.current_weapon].cool_down_counter == 0:
             bullet = Bullet(self.x, self.y, self.bullet_img)
             self.bullets.append(bullet)
-            self.cool_down_counter = 1
+            self.weapons[self.current_weapon].cool_down_counter = 1
 
     def get_width(self):
         return self.ship_img.get_width()
@@ -96,45 +122,56 @@ class Ship:
 class Player(Ship):
     def __init__(self, x, y, health=100):
         super().__init__(x, y, health)
+        self.swap_weapon_countdown = 30
         self.ship_img = PLAYER_SHIP
-        self.weapons= {
-                1: (PLAYER_BULLET_1, 10, 40),
-                2: (PLAYER_BULLET_2, 3, 20),
-                3: (PLAYER_BULLET_3, 12, 60),
-                4: (PLAYER_BULLET_4, 8, 45)
-                }
-        self.current_weapon = 1
-        self.bullet_img = self.weapons[self.current_weapon][0]
+        self.create_weapon()
+        self.bullet_img = self.weapons[self.current_weapon].image
         self.mask = pygame.mask.from_surface(self.ship_img)
-        self.max_health = health
+        self.point = 0
+
+    def create_weapon(self):
+        weapon1 = PlayerWeapon(50, 10, 20, PLAYER_BULLET_1, 1)
+        weapon2 = PlayerWeapon(30, 12, 15, PLAYER_BULLET_2, 1)
+        weapon3 = PlayerWeapon(70, 8, 25, PLAYER_BULLET_3, 1)
+        weapon4 = PlayerWeapon(55, 10, 30, PLAYER_BULLET_4, 1)
+        self.weapons[1] = weapon1
+        self.weapons[2] = weapon2
+        self.weapons[3] = weapon3
+        self.weapons[4] = weapon4
 
     def move_bullets(self, objs):
-        self.cooldown()
+        for value in self.weapons.values():
+            value.cooldown()
         for bullet in self.bullets:
-            bullet.move(self.weapons[self.current_weapon][1])
+            bullet.move(self.weapons[self.current_weapon].velocity)
             if bullet.off_screen(WIDTH):
                 self.bullets.remove(bullet)
             else:
                 for obj in objs:
                     if bullet.collision(obj):
-                        objs.remove(obj)
+                        obj.health -= self.weapons[self.current_weapon].damage
+                        if obj.health <= 0:
+                            objs.remove(obj)
+                            self.point += 50
                         if bullet in self.bullets:
                             self.bullets.remove(bullet)
 
-    def draw(self, window):
-        super().draw(window)
-        self.healthbar(window)
+    def shoot(self):
+        if self.weapons[self.current_weapon].cool_down_counter == 0:
+            bullet = Bullet(self.x, self.y, self.bullet_img)
+            self.bullets.append(bullet)
+            self.weapons[self.current_weapon].cool_down_counter = 1
+            self.point -= 5
 
-    def healthbar(self, window):
-        pygame.draw.rect(window, (255,0,0), (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width(), 10))
-        pygame.draw.rect(window, (0,255,0), (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width() * (self.health/self.max_health), 10))
     def swap_weapon(self):
-        if self.cool_down_counter == 0:
+        if self.weapons[self.current_weapon].cool_down_counter == 0:
             if self.current_weapon == 4:
                 self.current_weapon = 1
             else:
                 self.current_weapon += 1
-            self.bullet_img = self.weapons[self.current_weapon][0]
+            self.bullet_img = self.weapons[self.current_weapon].image
+
+
 class Enemy(Ship):
     COLOR_MAP = {
                 "red": (ENEMY_SHIP_1, ENEMY_BULLET_1),
@@ -146,16 +183,13 @@ class Enemy(Ship):
         super().__init__(x, y, health)
         self.ship_img, self.bullet_img = self.COLOR_MAP[color]
         self.mask = pygame.mask.from_surface(self.ship_img)
+        self.create_weapon()
 
+    def create_weapon(self):
+        weapon1 = PlayerWeapon(50, 10, 20, ENEMY_BULLET_1, 1)
+        self.weapons[1] = weapon1
     def move(self, vel):
         self.x -= vel
-
-    def shoot(self):
-        if self.cool_down_counter == 0:
-            bullet = Bullet(self.x-20, self.y, self.bullet_img)
-            self.bullets.append(bullet)
-            self.cool_down_counter = 1
-
 
 def collide(object_1, object_2):
     offset_x = object_2.x - object_1.x
@@ -189,9 +223,11 @@ def main():
         WIN.blit(BG, (0,0))
         # draw text
         lives_label = main_font.render(f"Lives: {lives}", 1, (255,255,255))
+        score_label = main_font.render(f"Score: {player.point}", 1, (255, 255, 255))
         level_label = main_font.render(f"Level: {level}", 1, (255,255,255))
 
         WIN.blit(lives_label, (10, 10))
+        WIN.blit(score_label, ((WIDTH - level_label.get_width() - 10)/2, 10))
         WIN.blit(level_label, (WIDTH - level_label.get_width() - 10, 10))
 
         for enemy in enemies:
@@ -244,7 +280,6 @@ def main():
         if keys[pygame.K_SPACE]:
             player.shoot()
 
-
         for enemy in enemies[:]:
             enemy.move(enemy_vel)
             enemy.move_bullets(bullet_vel, player)
@@ -255,7 +290,7 @@ def main():
             if collide(enemy, player):
                 player.health -= 10
                 enemies.remove(enemy)
-            elif enemy.y + enemy.get_height() > HEIGHT:
+            elif enemy.x <= 0:
                 lives -= 1
                 enemies.remove(enemy)
 
