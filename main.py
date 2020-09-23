@@ -259,7 +259,7 @@ def main():
             level += 1
             wave_length += 5
             for i in range(wave_length):
-                enemy = Enemy(random.randrange(WIDTH + 100,WIDTH + 1500),random.randrange(50, HEIGHT-100), random.choice(["red", "blue", "green"]))
+                enemy = Enemy(random.randrange(WIDTH + 100,WIDTH + 1500),random.randrange(50, HEIGHT-100), random.choice(["red", "blue", "green"]),random.randint(50,150))
                 enemies.append(enemy)
 
         for event in pygame.event.get():
